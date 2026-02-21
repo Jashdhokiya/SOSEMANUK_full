@@ -1,7 +1,7 @@
 package com.jash.matlabcrypto.controller;
 
 import com.jash.matlabcrypto.dto.CryptoRequest;
-import com.jash.matlabcrypto.service.MatlabService;
+import com.jash.matlabcrypto.service.SosemanukService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,33 +10,39 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin
 public class CryptoController {
 
-    private final MatlabService matlabService;
+    private final SosemanukService sosemanukService;
 
-    public CryptoController(MatlabService matlabService) {
-        this.matlabService = matlabService;
+    public CryptoController(SosemanukService sosemanukService) {
+        this.sosemanukService = sosemanukService;
     }
 
     @PostMapping("/encrypt")
-    public ResponseEntity<String> encrypt(@RequestBody CryptoRequest request) throws Exception {
-        System.out.println("KEY FROM FRONTEND: " + request.getKey());
-        System.out.println("IV FROM FRONTEND: " + request.getIv());
-        return ResponseEntity.ok(
-                matlabService.process(request.getMsg(),
-                        request.getKey(),
-                        request.getIv(),
-                        "encrypt")
-        );
+    public ResponseEntity<String> encrypt(@RequestBody CryptoRequest request) {
+        try {
+            String result = sosemanukService.process(
+                    request.getMsg(),
+                    request.getKey(),
+                    request.getIv(),
+                    "encrypt"
+            );
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Encryption Error: " + e.getMessage());
+        }
     }
 
     @PostMapping("/decrypt")
-    public ResponseEntity<String> decrypt(@RequestBody CryptoRequest request) throws Exception {
-        return ResponseEntity.ok(
-                matlabService.process(request.getMsg(),
-                        request.getKey(),
-                        request.getIv(),
-                        "decrypt")
-        );
+    public ResponseEntity<String> decrypt(@RequestBody CryptoRequest request) {
+        try {
+            String result = sosemanukService.process(
+                    request.getMsg(),
+                    request.getKey(),
+                    request.getIv(),
+                    "decrypt"
+            );
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Decryption Error: " + e.getMessage());
+        }
     }
-
-
 }
