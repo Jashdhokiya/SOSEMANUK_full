@@ -84,17 +84,56 @@ public class SosemanukEngine {
     }
 
     private int fsmStep() {
+        // 1. Calculate the new R1 (Equation 19)
+        // Needs to use R2 from previous state
         int muxOut = ((r1 & 1) == 1) ? (s[1] ^ s[8]) : s[1];
-        int r1New = (int) (((long) (r2 & 0xFFFFFFFFL) + (muxOut & 0xFFFFFFFFL)) & 0xFFFFFFFFL);
+        int r1Next = (int)(((long)(r2 & 0xFFFFFFFFL) + (muxOut & 0xFFFFFFFFL)) & 0xFFFFFFFFL);
 
-        // Trans function
+        // 2. Calculate the output value f_t (Equation 21)
+        // IMPORTANT: This uses the NEW R1 but the OLD R2
+        int f_t = (int)(((long)(s[9] & 0xFFFFFFFFL) + (r1Next & 0xFFFFFFFFL)) & 0xFFFFFFFFL) ^ r2;
+
+        // 3. Update R2 for next time (Equation 20)
+        // Trans(z) = (0x54655307 * z mod 2^32) >>> 7 (Rotate Right)
         long prod = (0x54655307L * (r1 & 0xFFFFFFFFL)) & 0xFFFFFFFFL;
-        int r2New = Integer.rotateRight((int) prod, 7);
+        int r2Next = Integer.rotateRight((int) prod, 7);
 
-        this.r1 = r1New;
-        this.r2 = r2New;
+        // 4. Update state
+        this.r1 = r1Next;
+        this.r2 = r2Next;
 
-        return (int) (((long) (s[9] & 0xFFFFFFFFL) + (r1New & 0xFFFFFFFFL)) & 0xFFFFFFFFL) ^ r2New;
+        return f_t;
+    }
+
+    private int[] serpentKeySchedule(byte[] keyBytes) {
+        int[] w = new int[132];
+        byte[] padded = new byte[32];
+        System.arraycopy(keyBytes, 0, padded, 0, Math.min(keyBytes.length, 32));
+
+        // Initialize first 8 words
+        for (int i = 0; i < 8; i++) {
+            w[i] = (padded[i*4] & 0xFF) | ((padded[i*4+1] & 0xFF) << 8) |
+                    ((padded[i*4+2] & 0xFF) << 16) | ((padded[i*4+3] & 0xFF) << 24);
+        }
+
+        // Expansion logic - Fix: use (i-1) not (i-8)
+        int phi = 0x9e3779b9;
+        for (int i = 8; i < 132; i++) {
+            int val = w[i-8] ^ w[i-5] ^ w[i-3] ^ w[i-1] ^ phi ^ (i-8); // The (i-8) here matches 0-based index logic
+            w[i] = Integer.rotateLeft(val, 11);
+        }
+
+        int[] subkeys = new int[100];
+        for (int i = 0; i < 25; i++) {
+            int sboxIdx = (3 - i) % 8;
+            if (sboxIdx < 0) sboxIdx += 8;
+
+            // Grab the expanded words
+            int[] slice = {w[4*i + 8], w[4*i + 9], w[4*i + 10], w[4*i + 11]};
+            int[] k = applySboxToWords(slice, sboxIdx);
+            System.arraycopy(k, 0, subkeys, i * 4, 4);
+        }
+        return subkeys;
     }
 
     private void clockLFSR() {
@@ -134,31 +173,7 @@ public class SosemanukEngine {
         return x;
     }
 
-    private int[] serpentKeySchedule(byte[] keyBytes) {
-        int[] w = new int[132];
-        byte[] padded = new byte[32];
-        System.arraycopy(keyBytes, 0, padded, 0, Math.min(keyBytes.length, 32));
 
-        for (int i = 0; i < 8; i++) {
-            w[i] = (padded[i*4] & 0xFF) | ((padded[i*4+1] & 0xFF) << 8) |
-                    ((padded[i*4+2] & 0xFF) << 16) | ((padded[i*4+3] & 0xFF) << 24);
-        }
-
-        int phi = 0x9e3779b9;
-        for (int i = 8; i < 132; i++) {
-            w[i] = Integer.rotateLeft(w[i-8] ^ w[i-5] ^ w[i-3] ^ w[i-1] ^ phi ^ (i-8), 11);
-        }
-
-        int[] subkeys = new int[100];
-        for (int i = 0; i < 25; i++) {
-            int sboxIdx = (3 - i) % 8;
-            if (sboxIdx < 0) sboxIdx += 8;
-            int[] slice = {w[4*i+8], w[4*i+9], w[4*i+10], w[4*i+11]};
-            int[] k = applySboxToWords(slice, sboxIdx);
-            System.arraycopy(k, 0, subkeys, i * 4, 4);
-        }
-        return subkeys;
-    }
 
     private int[] applySboxToWords(int[] words, int sboxIdx) {
         int[] out = new int[words.length];

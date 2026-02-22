@@ -1,9 +1,9 @@
-addpath('D:/College/sem 5/IS/project')
+addpath('D:\College\sem 5\IS\SOSEMANUK\MATLABsource')
 
-msg  = getenv('MSG');
-key  = getenv('KEY');
-iv   = getenv('IV');
-mode = getenv('MODE');
+msg  = 'hello';
+key  = 'mykey';
+iv   = 'myiv';
+mode = 'encrypt';
 
 result = main(msg, key, iv, mode);
 

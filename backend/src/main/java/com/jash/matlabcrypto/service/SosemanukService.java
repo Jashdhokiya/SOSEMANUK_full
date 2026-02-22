@@ -6,7 +6,18 @@ import java.util.HexFormat; // Available in Java 17+
 
 @Service
 public class SosemanukService {
+    // Add this method to your existing SosemanukService.java
+    public byte[] processFile(byte[] fileData, String keyHex, String ivHex) throws Exception {
+        // 1. Prepare Key/IV using your existing helper
+        byte[] key = parseHex(keyHex, 64);
+        byte[] iv = parseHex(ivHex, 32);
 
+        // 2. Initialize the engine
+        SosemanukEngine engine = new SosemanukEngine(key, iv);
+
+        // 3. Process the bytes (Sosemanuk is a stream cipher, so encrypt/decrypt is the same XOR)
+        return engine.process(fileData);
+    }
     public String process(String msg, String keyHex, String ivHex, String mode) throws Exception {
         // 1. Sanitize and prepare Key/IV (matching your MATLAB logic)
         byte[] key = parseHex(keyHex, 64); // 32 bytes = 64 hex chars
