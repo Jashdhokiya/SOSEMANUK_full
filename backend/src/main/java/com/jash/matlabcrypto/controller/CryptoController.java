@@ -22,12 +22,19 @@ public class CryptoController {
     @PostMapping("/encrypt")
     public ResponseEntity<String> encrypt(@RequestBody CryptoRequest request) {
         try {
+//            if(request.getKey().equals("")){
+//
+//            }
+//            if(request.getIv().equals("")){
+//
+//            }
             String result = sosemanukService.process(
                     request.getMsg(),
                     request.getKey(),
                     request.getIv(),
                     "encrypt"
             );
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Encryption Error: " + e.getMessage());

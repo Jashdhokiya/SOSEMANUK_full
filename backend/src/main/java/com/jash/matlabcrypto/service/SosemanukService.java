@@ -3,11 +3,18 @@ package com.jash.matlabcrypto.service;
 import com.jash.matlabcrypto.cryptoEngine.SosemanukEngine;
 import org.springframework.stereotype.Service;
 import java.util.HexFormat; // Available in Java 17+
+import java.util.Random;
 
 @Service
 public class SosemanukService {
     // Add this method to your existing SosemanukService.java
     public byte[] processFile(byte[] fileData, String keyHex, String ivHex) throws Exception {
+        if(keyHex.equals("")){
+            keyHex = randomKey();
+        }
+        if(ivHex.equals("")){
+            ivHex = randomIv();
+        }
         // 1. Prepare Key/IV using your existing helper
         byte[] key = parseHex(keyHex, 64);
         byte[] iv = parseHex(ivHex, 32);
@@ -50,6 +57,28 @@ public class SosemanukService {
             clean = clean.substring(0, requiredLen);
         }
         return hexToBytes(clean);
+    }
+
+    private String randomKey(){
+        String SALTCHARS = "ABCDEF1234567890";
+        StringBuilder salt = new StringBuilder();
+        Random rnd = new Random();
+        while (salt.length() < 32) { // length of the random string.
+            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
+            salt.append(SALTCHARS.charAt(index));
+        }
+        return salt.toString();
+    }
+    private String randomIv(){
+
+        String SALTCHARS = "ABCDEF1234567890";
+        StringBuilder salt = new StringBuilder();
+        Random rnd = new Random();
+        while (salt.length() < 16) { // length of the random string.
+            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
+            salt.append(SALTCHARS.charAt(index));
+        }
+        return salt.toString();
     }
 
     private byte[] hexToBytes(String s) {
