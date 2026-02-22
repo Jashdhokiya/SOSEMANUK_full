@@ -38,6 +38,13 @@ export default function App() {
 
         if (!response.ok) throw new Error();
 
+        // 🔹 Read generated key/IV from headers
+        const generatedKey = response.headers.get("X-Generated-Key");
+        const generatedIv = response.headers.get("X-Generated-IV");
+
+        if (generatedKey) setCipherKey(generatedKey);
+        if (generatedIv) setInitialVector(generatedIv);
+
         const blob = await response.blob();
 
         const url = window.URL.createObjectURL(blob);
@@ -47,6 +54,7 @@ export default function App() {
           mode === "encrypt" ? "encrypted.pdf" : "decrypted.pdf";
         a.click();
       }
+
       // ================= TEXT FLOW =================
       else {
         const endpoint =
@@ -66,8 +74,12 @@ export default function App() {
 
         if (!response.ok) throw new Error();
 
-        const data = await response.text();
-        setOutputText(data);
+        // 🔹 Backend now returns JSON { output, keyUsed, ivUsed }
+        const data = await response.json();
+
+        setOutputText(data.output);
+        setCipherKey(data.keyUsed);
+        setInitialVector(data.ivUsed);
       }
     } catch (err) {
       setError("Failed to process request");
@@ -81,24 +93,24 @@ export default function App() {
       <Header />
 
       <main className="flex-1 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-2xl">
-        <EncryptionForm
-          mode={mode}
-          setMode={setMode}
-          inputText={inputText}
-          setInputText={setInputText}
-          outputText={outputText}
-          handleProcess={handleProcess}
-          setOutputText={setOutputText}
-          initialVector={initialVector}
-          setInitialVector={setInitialVector}
-          cipherKey={cipherKey}
-          setCipherKey={setCipherKey}
-          pdfFile={pdfFile}
-          setPdfFile={setPdfFile}
-          loading={loading}
-          error={error}
-        />
+        <div className="w-full max-w-2xl">
+          <EncryptionForm
+            mode={mode}
+            setMode={setMode}
+            inputText={inputText}
+            setInputText={setInputText}
+            outputText={outputText}
+            handleProcess={handleProcess}
+            setOutputText={setOutputText}
+            initialVector={initialVector}
+            setInitialVector={setInitialVector}
+            cipherKey={cipherKey}
+            setCipherKey={setCipherKey}
+            pdfFile={pdfFile}
+            setPdfFile={setPdfFile}
+            loading={loading}
+            error={error}
+          />
         </div>
       </main>
 
