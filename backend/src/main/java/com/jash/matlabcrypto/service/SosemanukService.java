@@ -2,55 +2,85 @@ package com.jash.matlabcrypto.service;
 
 import com.jash.matlabcrypto.cryptoEngine.SosemanukEngine;
 import org.springframework.stereotype.Service;
-import java.util.HexFormat; // Available in Java 17+
-import java.util.Random;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 
 @Service
 public class SosemanukService {
-    // Add this method to your existing SosemanukService.java
-    public byte[] processFile(byte[] fileData, String keyHex, String ivHex) throws Exception {
-        if(keyHex.equals("")){
-            keyHex = randomKey();
-        }
-        if(ivHex.equals("")){
-            ivHex = randomIv();
-        }
-        // 1. Prepare Key/IV using your existing helper
-        byte[] key = parseHex(keyHex, 64);
-        byte[] iv = parseHex(ivHex, 32);
 
-        // 2. Initialize the engine
-        SosemanukEngine engine = new SosemanukEngine(key, iv);
+    // A simple wrapper to carry both the PDF bytes and the keys back to the controller
+    public static class ProcessResult {
+        public final byte[] data;
+        public final String keyUsed;
+        public final String ivUsed;
 
-        // 3. Process the bytes (Sosemanuk is a stream cipher, so encrypt/decrypt is the same XOR)
-        return engine.process(fileData);
+        public ProcessResult(byte[] data, String keyUsed, String ivUsed) {
+            this.data = data;
+            this.keyUsed = keyUsed;
+            this.ivUsed = ivUsed;
+        }
     }
-    public String process(String msg, String keyHex, String ivHex, String mode) throws Exception {
-        // 1. Sanitize and prepare Key/IV (matching your MATLAB logic)
-        byte[] key = parseHex(keyHex, 64); // 32 bytes = 64 hex chars
-        byte[] iv = parseHex(ivHex, 32);   // 16 bytes = 32 hex chars
 
-        // 2. Initialize the native Java Engine
+    public static class TextResult {
+        public final String output;
+        public final String keyUsed;
+        public final String ivUsed;
+
+        public TextResult(String output, String keyUsed, String ivUsed) {
+            this.output = output;
+            this.keyUsed = keyUsed;
+            this.ivUsed = ivUsed;
+        }
+    }
+
+    /**
+     * Processes files (PDFs) and generates random keys if they are missing.
+     */
+    public ProcessResult processFile(byte[] fileData, String keyHex, String ivHex) throws Exception {
+        // 1. Generate random keys if inputs are empty or null
+        String finalKey = (keyHex == null || keyHex.isBlank()) ? randomHexString(64) : keyHex;
+        String finalIv = (ivHex == null || ivHex.isBlank()) ? randomHexString(32) : ivHex;
+
+        // 2. Prepare Key/IV (Padding/Sanitizing)
+        byte[] keyBytes = parseHex(finalKey, 64);
+        byte[] ivBytes = parseHex(finalIv, 32);
+
+        // 3. Initialize Engine and Process
+        SosemanukEngine engine = new SosemanukEngine(keyBytes, ivBytes);
+        byte[] processedData = engine.process(fileData);
+
+        // 4. Return the data along with the keys used
+        return new ProcessResult(processedData, finalKey, finalIv);
+    }
+
+    /**
+     * Processes text messages (Standard mode).
+     */
+    public TextResult process(String msg, String keyHex, String ivHex, String mode) throws Exception {
+        // 1. Generate random keys for text if empty (consistent with PDF logic)
+        String finalKey = (keyHex == null || keyHex.isBlank()) ? randomHexString(64) : keyHex;
+        String finalIv = (ivHex == null || ivHex.isBlank()) ? randomHexString(32) : ivHex;
+
+        byte[] key = parseHex(finalKey, 64);
+        byte[] iv = parseHex(finalIv, 32);
+
         SosemanukEngine engine = new SosemanukEngine(key, iv);
 
         if ("encrypt".equalsIgnoreCase(mode)) {
-            // Text -> Bytes -> Encrypt -> Hex String
             byte[] inputBytes = msg.getBytes();
             byte[] encrypted = engine.process(inputBytes);
-            return bytesToHex(encrypted);
+            return new TextResult(bytesToHex(encrypted), finalKey, finalIv);
         } else {
-            // Hex String -> Bytes -> Decrypt -> Text
             byte[] cipherBytes = hexToBytes(msg);
             byte[] decrypted = engine.process(cipherBytes);
-            return new String(decrypted);
+            return new TextResult(new String(decrypted), finalKey, finalIv);
         }
     }
 
-    // --- Helper Methods to match MATLAB's hex handling ---
+    // --- Helper Methods ---
 
     private byte[] parseHex(String hex, int requiredLen) {
-        String clean = hex == null ? "" : hex.replaceAll("[^0-9A-Fa-f]", "");
-        // Pad or truncate to match your MATLAB 'pad' logic
+        String clean = (hex == null) ? "" : hex.replaceAll("[^0-9A-Fa-f]", "");
         if (clean.length() < requiredLen) {
             clean = String.format("%-" + requiredLen + "s", clean).replace(' ', '0');
         } else {
@@ -59,30 +89,15 @@ public class SosemanukService {
         return hexToBytes(clean);
     }
 
-    private String randomKey(){
-        String SALTCHARS = "ABCDEF1234567890";
-        StringBuilder salt = new StringBuilder();
-        Random rnd = new Random();
-        while (salt.length() < 32) { // length of the random string.
-            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
-            salt.append(SALTCHARS.charAt(index));
-        }
-        return salt.toString();
-    }
-    private String randomIv(){
-
-        String SALTCHARS = "ABCDEF1234567890";
-        StringBuilder salt = new StringBuilder();
-        Random rnd = new Random();
-        while (salt.length() < 16) { // length of the random string.
-            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
-            salt.append(SALTCHARS.charAt(index));
-        }
-        return salt.toString();
+    private String randomHexString(int length) {
+        // Use SecureRandom for cryptographic strength
+        SecureRandom sr = new SecureRandom();
+        byte[] bytes = new byte[length / 2];
+        sr.nextBytes(bytes);
+        return HexFormat.of().withUpperCase().formatHex(bytes);
     }
 
     private byte[] hexToBytes(String s) {
-        // If using Java 17+, HexFormat is much cleaner:
         return HexFormat.of().parseHex(s);
     }
 
