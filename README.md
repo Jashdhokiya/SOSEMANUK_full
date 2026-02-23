@@ -13,7 +13,7 @@ OR
 - Clone the repository:
 
 ```bash
-git clone <your-repository-link>
+git clone https://github.com/Jashdhokiya/SOSEMANUK_full
 cd <project-folder>
 ```
 
